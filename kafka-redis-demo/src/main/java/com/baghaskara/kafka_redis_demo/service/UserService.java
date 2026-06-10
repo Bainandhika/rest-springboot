@@ -3,6 +3,7 @@ package com.baghaskara.kafka_redis_demo.service;
 import com.baghaskara.kafka_redis_demo.domain.User;
 import com.baghaskara.kafka_redis_demo.repository.UserRepository;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,15 +16,26 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final RedisTemplate<String, Object> redisTemplate;
+    private final KafkaTemplate<String, String> kafkaTemplate;
 
-    public UserService(UserRepository userRepository, RedisTemplate<String, Object> redisTemplate) {
+    public UserService(UserRepository userRepository, RedisTemplate<String, Object> redisTemplate,
+            KafkaTemplate<String, String> kafkaTemplate) {
         this.userRepository = userRepository;
         this.redisTemplate = redisTemplate;
+        this.kafkaTemplate = kafkaTemplate;
     }
 
     @Transactional
     public User createUser(User user) {
-        return userRepository.save(user);
+        User savedUser = userRepository.save(user);
+
+        // KAFKA PRODUCER LOGIC
+        // Kirim event asinkron ke topic 'user-events'.
+        // Parameter: (topicName, key, value). Key digunakan untuk partitioning.
+        String eventMessage = "New user registered: " + savedUser.getFullName() + " (" + savedUser.getEmail() + ")";
+        kafkaTemplate.send("user-events", savedUser.getEmail(), eventMessage);
+
+        return savedUser;
     }
 
     public List<User> getAllUsers() {
@@ -37,7 +49,7 @@ public class UserService {
         // UserNotFoundException
         // yang di-handle oleh @ControllerAdvice untuk return 404 yang rapi.
     }
-    
+
     // ==========================================
     // REDIS INTEGRATION STARTS HERE
     // ==========================================

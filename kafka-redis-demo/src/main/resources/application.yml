@@ -5,13 +5,19 @@ spring:
     password: password
   jpa:
     hibernate:
-      # WARNING: Use 'validate' or 'none' in production! 
+      # WARNING: Use 'validate' or 'none' in production!
       # 'update' is only for local dev to auto-create tables.
       ddl-auto: update
     show-sql: true
     properties:
       hibernate:
         format_sql: true
+  kafka:
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      # acks=all memastikan pesan tidak hilang selama ada minimal 1 broker yang menerima
+      acks: all
 
 server:
   port: 8080

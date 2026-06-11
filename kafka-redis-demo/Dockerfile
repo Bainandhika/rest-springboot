@@ -1,33 +1,36 @@
 # ==========================================
 # STAGE 1: BUILD THE APPLICATION
 # ==========================================
-# Kita pakai JDK Alpine biar proses compile Maven cepat dan image-nya relatif kecil
 FROM eclipse-temurin:21-jdk-alpine AS build
-
-# Set working directory di dalam container
 WORKDIR /app
 
-# Copy semua file project ke dalam container
-COPY . .
+# 1. COPY DEPENDENCY FILES ONLY
+# Kita copy pom.xml dan Maven wrapper dulu. 
+# Layer ini akan di-CACHE oleh Docker selama pom.xml tidak berubah!
+COPY pom.xml mvnw ./
+COPY .mvn .mvn
 
-# Jalankan Maven untuk build .jar file. 
-# -DskipTests biar build cepat (kita asumsikan test sudah dijalankan di CI/CD pipeline)
+# 2. DOWNLOAD DEPENDENCIES (OFFLINE MODE)
+# Ini cuma jalan kalau ada perubahan di pom.xml. 
+# Kalau lu cuma ubah code Java, step ini di-SKIP (super cepat!).
+RUN ./mvnw dependency:go-offline
+
+# 3. COPY SOURCE CODE
+# Baru kita copy folder src yang isinya code Java lu.
+COPY src ./src
+
+# 4. BUILD THE JAR
+# Compile code jadi .jar. Step ini yang jalan tiap kali lu update code.
 RUN ./mvnw clean package -DskipTests
 
 # ==========================================
 # STAGE 2: CREATE THE RUNTIME IMAGE
 # ==========================================
-# Kita cuma butuh JRE (Java Runtime Environment) untuk menjalankan .jar, nggak butuh JDK (yang ada compiler-nya)
 FROM eclipse-temurin:21-jre-alpine
-
 WORKDIR /app
 
-# Copy HANYA file .jar dari stage 'build' ke stage ini.
-# Ini yang bikin image final kita kecil! (Layer caching juga bikin rebuild cepat)
+# Copy HANYA file .jar dari stage 'build'
 COPY --from=build /app/target/*.jar app.jar
 
-# Expose port yang dipakai aplikasi
 EXPOSE 8080
-
-# Command untuk menjalankan aplikasi
 ENTRYPOINT ["java", "-jar", "app.jar"]

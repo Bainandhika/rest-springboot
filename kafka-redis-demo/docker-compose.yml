@@ -68,6 +68,33 @@ services:
     networks:
       - baghaskara_network
 
+  app:
+    build: . # Docker akan mencari file 'Dockerfile' di folder yang sama dan build image-nya
+    container_name: baghaskara_app
+    ports:
+      - "8080:8080"
+    environment:
+      # SPRING BOOT MAGIC: Environment variables ini akan OVERRIDE nilai di application.yml secara otomatis!
+      # Format: SPRING_[CATEGORY]_[PROPERTY] -> spring.category.property
+      
+      # 1. Database: Pakai nama service 'postgres' dan port internal 5432
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/baghaskara_db
+      
+      # 2. Redis: Pakai nama service 'redis'
+      - SPRING_DATA_REDIS_HOST=redis
+      
+      # 3. Kafka: PENTING! Pakai PLAINTEXT_INTERNAL dan port 29092 karena app kita ada di dalam Docker network
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      
+      # Opsional: Set profile Spring (kalau lu mau beda-beda config)
+      - SPRING_PROFILES_ACTIVE=docker
+    depends_on:
+      - postgres
+      - redis
+      - kafka
+    networks:
+      - baghaskara_network
+
 volumes:
   postgres_data:
   pgadmin_data:

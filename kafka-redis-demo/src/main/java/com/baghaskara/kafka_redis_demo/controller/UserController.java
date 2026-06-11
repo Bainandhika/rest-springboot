@@ -36,17 +36,6 @@ public class UserController {
         return ResponseEntity.ok(userService.getUserByEmail(email));
     }
 
-    @PostMapping("/{email}/login")
-    public ResponseEntity<String> simulateLogin(@PathVariable String email) {
-        // 1. Increment counter (Atomic & Concurrency Safe)
-        Long count = userService.incrementLoginCount(email);
-
-        // 2. Add to activity list
-        userService.addRecentActivity(email, "Logged in at " + java.time.LocalDateTime.now());
-
-        return ResponseEntity.ok("Login successful. Total logins: " + count);
-    }
-
     @GetMapping("/{email}/activities")
     public ResponseEntity<List<Object>> getActivities(@PathVariable String email) {
         return ResponseEntity.ok(userService.getRecentActivities(email));

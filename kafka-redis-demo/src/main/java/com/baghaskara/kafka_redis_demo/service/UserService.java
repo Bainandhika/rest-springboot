@@ -1,6 +1,9 @@
 package com.baghaskara.kafka_redis_demo.service;
 
 import com.baghaskara.kafka_redis_demo.domain.User;
+import com.baghaskara.kafka_redis_demo.dto.CreateUserRequest;
+import com.baghaskara.kafka_redis_demo.dto.UserResponse;
+import com.baghaskara.kafka_redis_demo.exception.ResourceNotFoundException;
 import com.baghaskara.kafka_redis_demo.repository.UserRepository;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -10,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Service
 public class UserService {
@@ -26,7 +30,12 @@ public class UserService {
     }
 
     @Transactional
-    public User createUser(User user) {
+    public UserResponse createUser(CreateUserRequest request) {
+        // 1. Map DTO to Entity
+        User user = new User();
+        user.setEmail(request.email());
+        user.setFullName(request.fullName());
+
         User savedUser = userRepository.save(user);
 
         // KAFKA PRODUCER LOGIC
@@ -35,19 +44,19 @@ public class UserService {
         String eventMessage = "New user registered: " + savedUser.getFullName() + " (" + savedUser.getEmail() + ")";
         kafkaTemplate.send("user-events", savedUser.getEmail(), eventMessage);
 
-        return savedUser;
+        return mapToUserResponse(savedUser);
     }
 
-    public List<User> getAllUsers() {
-        return userRepository.findAll();
+    public List<UserResponse> getAllUsers() {
+        return userRepository.findAll().stream()
+                .map(this::mapToUserResponse)
+                .collect(Collectors.toList());
     }
 
-    public User getUserByEmail(String email) {
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
-        // Note: Di production, lebih baik lempar custom exception seperti
-        // UserNotFoundException
-        // yang di-handle oleh @ControllerAdvice untuk return 404 yang rapi.
+    public UserResponse getUserByEmail(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
+        return mapToUserResponse(user);
     }
 
     // ==========================================
@@ -102,14 +111,14 @@ public class UserService {
      * Sangat efisien untuk menyimpan objek dengan banyak field yang mungkin
      * di-update sebagian.
      */
-    public void cacheUserProfile(String email, User user) {
+    public void cacheUserProfile(String email, UserResponse user) {
         String key = "user:" + email + ":profile";
 
         // putAll equivalent to HMSET
         redisTemplate.opsForHash().putAll(key, Map.of(
-                "id", user.getId(),
-                "fullName", user.getFullName(),
-                "email", user.getEmail()));
+                "id", user.id(),
+                "fullName", user.fullName(),
+                "email", user.email()));
 
         redisTemplate.expire(key, 1, TimeUnit.HOURS);
     }
@@ -118,5 +127,14 @@ public class UserService {
         String key = "user:" + email + ":profile";
         // entries equivalent to HGETALL
         return redisTemplate.opsForHash().entries(key);
+    }
+
+    private UserResponse mapToUserResponse(User user) {
+        // Mapping manual dari Entity ke DTO. Di production, bisa pakai library seperti
+        // MapStruct.
+        return new UserResponse(
+                user.getId(),
+                user.getEmail(),
+                user.getFullName());
     }
 }

@@ -1,6 +1,7 @@
 package com.baghaskara.kafka_redis_demo.controller;
 
-import com.baghaskara.kafka_redis_demo.domain.User;
+import com.baghaskara.kafka_redis_demo.dto.CreateUserRequest;
+import com.baghaskara.kafka_redis_demo.dto.UserResponse;
 import com.baghaskara.kafka_redis_demo.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -15,29 +16,24 @@ public class UserController {
 
     private final UserService userService;
 
-    // Controller sekarang cuma bergantung pada Service, TIDAK LANGSUNG ke
-    // Repository.
-    // Ini membuat Controller tetap "bersih" dari detail implementasi database.
     public UserController(UserService userService) {
         this.userService = userService;
     }
 
     @PostMapping
-    public ResponseEntity<User> createUser(@Valid @RequestBody User user) {
-        User savedUser = userService.createUser(user);
+    public ResponseEntity<UserResponse> createUser(@Valid @RequestBody CreateUserRequest request) {
+        UserResponse savedUser = userService.createUser(request);
         return ResponseEntity.ok(savedUser);
     }
 
     @GetMapping
-    public ResponseEntity<List<User>> getAllUsers() {
-        List<User> users = userService.getAllUsers();
-        return ResponseEntity.ok(users);
+    public ResponseEntity<List<UserResponse>> getAllUsers() {
+        return ResponseEntity.ok(userService.getAllUsers());
     }
 
     @GetMapping("/{email}")
-    public ResponseEntity<User> getUserByEmail(@PathVariable String email) {
-        User user = userService.getUserByEmail(email);
-        return ResponseEntity.ok(user);
+    public ResponseEntity<UserResponse> getUserByEmail(@PathVariable String email) {
+        return ResponseEntity.ok(userService.getUserByEmail(email));
     }
 
     @PostMapping("/{email}/login")
@@ -59,7 +55,7 @@ public class UserController {
     @PostMapping("/{email}/cache-profile")
     public ResponseEntity<String> cacheProfile(@PathVariable String email) {
         // Ambil dari DB dulu, baru simpan ke Redis Hash
-        User user = userService.getUserByEmail(email);
+        UserResponse user = userService.getUserByEmail(email);
         userService.cacheUserProfile(email, user);
         return ResponseEntity.ok("Profile cached in Redis Hash");
     }
